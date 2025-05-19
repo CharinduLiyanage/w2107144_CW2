@@ -88,16 +88,14 @@ message AddTicketStockRequest {
 message UpdateTicketPriceRequest {
   string event_id = 1;
   string tier = 2;
-  double price = 3;
+  int32 price = 3;
   bool is_sent_by_primary = 4;
 }
 
 message ReserveTicketsRequest {
   string event_id = 1;
   string tier = 2;
-  int32 count = 3;
   bool after_party = 4;
-  string customer_id = 5;
   bool is_sent_by_primary = 6;
 }
 

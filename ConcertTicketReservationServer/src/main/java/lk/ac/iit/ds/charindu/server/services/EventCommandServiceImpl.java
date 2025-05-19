@@ -11,6 +11,7 @@ import org.apache.zookeeper.KeeperException;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventCommandServiceImplBase implements DistributedTxListener {
@@ -111,13 +112,11 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
                     ReserveTicketsRequest request = ReserveTicketsRequest.newBuilder()
                             .setEventId(originalRequest.getEventId())
                             .setTier(originalRequest.getTier())
-                            .setCount(originalRequest.getCount())
                             .setAfterParty(originalRequest.getAfterParty())
-                            .setCustomerId(originalRequest.getCustomerId())
                             .setIsSentByPrimary(true)
                             .build();
                     clientStub.reserveTickets(request);
-                } else if (operationId.startsWith("bulk_reserve_")) {
+                } else if (operationId.startsWith("bulk_reserve_tickets_")) {
                     BulkReserveRequest originalRequest = (BulkReserveRequest) data;
                     BulkReserveRequest request = BulkReserveRequest.newBuilder()
                             .setEventId(originalRequest.getEventId())
@@ -357,20 +356,32 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
                 transactionStatus = true;
             } catch (KeeperException | InterruptedException e) {
                 System.err.println("Error while cancelling event: " + e.getMessage());
+                if (isTxnStarted) {
+                    System.out.println("Initiating Global Abort..");
+                    server.sendGlobalAbort();
+                }
                 transactionStatus = false;
             }
         } else {
             // Act as Secondary
-            if (request.getIsSentByPrimary()) {
-                System.out.println("Cancelling event as secondary, on primary's command");
-                String operation_id = "cancel_event_" + request.getEventId();
-                startDistributesTx(operation_id, request);
-                server.voteCommit();
-                transactionStatus = true;
-            } else {
-                // Forward to primary
-                EventResponse response = callPrimary(request);
-                transactionStatus = response.getSuccess();
+            try {
+                if (request.getIsSentByPrimary()) {
+                    System.out.println("Cancelling event as secondary, on primary's command");
+                    String operation_id = "cancel_event_" + request.getEventId();
+                    startDistributesTx(operation_id, request);
+                    server.voteCommit();
+                    transactionStatus = true;
+                } else {
+                    // Forward to primary
+                    EventResponse response = callPrimary(request);
+                    transactionStatus = response.getSuccess();
+                }
+            } catch (Exception e) {
+                if (isTxnStarted) {
+                    System.out.println("Initiating Vote Abort..");
+                    server.voteAbort();
+                }
+                transactionStatus = false;
             }
         }
 
@@ -382,6 +393,220 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
+
+    @Override
+    public void addTicketStock(AddTicketStockRequest request, StreamObserver<EventResponse> responseObserver) {
+        String eventId = request.getEventId();
+        System.out.println("[Command] Received add ticket stock request: " + eventId);
+        if (server.isLeader()) {
+            // Act as Primary
+            try {
+                System.out.println("Adding ticket stock as primary");
+                String operation_id = "add_ticket_stock_" + request.getEventId();
+                startDistributesTx(operation_id, request);
+                updateSecondaryServer(operation_id, request);
+                server.perform();
+                transactionStatus = true;
+            } catch (InterruptedException | KeeperException e) {
+                System.err.println("Error while adding ticket stock: " + e.getMessage());
+                if (isTxnStarted) {
+                    System.out.println("Initiating Global Abort..");
+                    server.sendGlobalAbort();
+                }
+                transactionStatus = false;
+            }
+        } else {
+            // Act as Secondary
+            try {
+                if (request.getIsSentByPrimary()) {
+                    System.out.println("Adding ticket stock as secondary, on primary's command");
+                    String operation_id = "add_ticket_stock_" + request.getEventId();
+                    startDistributesTx(operation_id, request);
+                    server.voteCommit();
+                    transactionStatus = true;
+                } else {
+                    // Forward to primary
+                    EventResponse response = callPrimary(request);
+                    transactionStatus = response.getSuccess();
+                }
+            } catch (Exception e) {
+                if (isTxnStarted) {
+                    System.out.println("Initiating Vote Abort..");
+                    server.voteAbort();
+                }
+                transactionStatus = false;
+            }
+        }
+
+        EventResponse response = EventResponse
+                .newBuilder()
+                .setSuccess(transactionStatus)
+                .setMessage(transactionStatus ? "Tickets added successfully" : "Failed to add ticket stock")
+                .build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updateTicketPrice(UpdateTicketPriceRequest request, StreamObserver<EventResponse> responseObserver) {
+        System.out.println("[Command] Received update ticket price request: " + request.getEventId());
+
+        if (server.isLeader()) {
+            // Act as primary
+            try {
+                System.out.println("Updating ticket price as primary");
+                String operation_id = "update_ticket_price_" + request.getEventId();
+                startDistributesTx(operation_id, request);
+                updateSecondaryServer(operation_id, request);
+                server.perform();
+                transactionStatus = true;
+            } catch (Exception e) {
+                System.err.println("Error while updating ticket price: " + e.getMessage());
+                if (isTxnStarted) {
+                    System.out.println("Initiating Global Abort..");
+                    server.sendGlobalAbort();
+                }
+                transactionStatus = false;
+            }
+        } else {
+            // Act as secondary
+            try {
+                if (request.getIsSentByPrimary()) {
+                    System.out.println("Updating ticket price as secondary, on primary's command");
+                    String operation_id = "update_ticket_price_" + request.getEventId();
+                    startDistributesTx(operation_id, request);
+                    server.voteCommit();
+                    transactionStatus = true;
+                } else {
+                    // Forward to primary
+                    EventResponse response = callPrimary(request);
+                    transactionStatus = response.getSuccess();
+                }
+            } catch (Exception e) {
+                if (isTxnStarted) {
+                    System.out.println("Initiating Vote Abort..");
+                    server.voteAbort();
+                }
+                transactionStatus = false;
+            }
+        }
+
+        EventResponse response = EventResponse
+                .newBuilder()
+                .setSuccess(transactionStatus)
+                .setMessage(transactionStatus ? "Tickets updated successfully" : "Failed to update ticket price")
+                .build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void reserveTickets(ReserveTicketsRequest request, StreamObserver<ReservationResponse> responseObserver) {
+        String eventId = request.getEventId();
+        System.out.println("[Command] Received reserve ticket request: " + eventId);
+        if (server.isLeader()) {
+            // Act as primary
+            try {
+                System.out.println("Reserving tickets as primary");
+                String operation_id = "reserve_tickets_" + request.getEventId();
+                startDistributesTx(operation_id, request);
+                updateSecondaryServer(operation_id, request);
+                server.perform();
+                transactionStatus = true;
+            } catch (Exception e) {
+                System.err.println("Error while reserving tickets: " + e.getMessage());
+                if (isTxnStarted) {
+                    System.out.println("Initiating Global Abort..");
+                    server.sendGlobalAbort();
+                }
+                transactionStatus = false;
+            }
+        } else {
+            // Act as secondary
+            try {
+                if (request.getIsSentByPrimary()) {
+                    System.out.println("Reserving tickets as secondary, on primary's command");
+                    String operation_id = "reserve_tickets_" + request.getEventId();
+                    startDistributesTx(operation_id, request);
+                    server.voteCommit();
+                    transactionStatus = true;
+                } else {
+                    // Forward to primary
+                    EventResponse response = callPrimary(request);
+                    transactionStatus = response.getSuccess();
+                }
+            } catch (Exception e) {
+                if (isTxnStarted) {
+                    System.out.println("Initiating Vote Abort..");
+                    server.voteAbort();
+                }
+                transactionStatus = false;
+            }
+        }
+
+        ReservationResponse response = ReservationResponse
+                .newBuilder()
+                .setSuccess(transactionStatus)
+                .setMessage(transactionStatus ? "Tickets reserved successfully" : "Failed to reserve tickets")
+                .build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void bulkReserve(BulkReserveRequest request, StreamObserver<ReservationResponse> responseObserver) {
+        String eventId = request.getEventId();
+        System.out.println("[Command] Received reserve ticket request: " + eventId);
+
+        if (server.isLeader()) {
+            // Act as primary
+            try {
+                System.out.println("Bulk reserving tickets as primary");
+                String operation_id = "bulk_reserve_tickets_" + request.getEventId();
+                startDistributesTx(operation_id, request);
+                updateSecondaryServer(operation_id, request);
+                server.perform();
+                transactionStatus = true;
+            } catch (Exception e) {
+                System.err.println("Error while bulk reserving tickets: " + e.getMessage());
+                if (isTxnStarted) {
+                    System.out.println("Initiating Global Abort..");
+                    server.sendGlobalAbort();
+                }
+                transactionStatus = false;
+            }
+        } else {
+            // Act as secondary
+            try {
+                if (request.getIsSentByPrimary()) {
+                    System.out.println("Bulk reserving tickets as secondary, on primary's command");
+                    String operation_id = "bulk_reserve_tickets_" + request.getEventId();
+                    startDistributesTx(operation_id, request);
+                    server.voteCommit();
+                    transactionStatus = true;
+                } else {
+                    // Forward to primary
+                    EventResponse response = callPrimary(request);
+                    transactionStatus = response.getSuccess();
+                }
+            } catch (Exception e) {
+                if (isTxnStarted) {
+                    System.out.println("Initiating Global Abort..");
+                    server.sendGlobalAbort();
+                }
+                transactionStatus = false;
+            }
+        }
+
+        ReservationResponse response = ReservationResponse
+                .newBuilder()
+                .setSuccess(transactionStatus)
+                .setMessage(transactionStatus ? "Tickets reserved successfully" : "Failed to reserve tickets")
+                .build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
 
     @Override
     public void setTxnStarted(boolean txnStarted) {
@@ -404,13 +629,21 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
                 updateEvent(eventRequest);
             } else if (operationId.startsWith("cancel_event_")) {
                 CancelEventRequest eventRequest = (CancelEventRequest) data;
-//                cancelEvent(eventRequest);
+                cancelEvent(eventRequest);
             } else if (operationId.startsWith("add_ticket_stock_")) {
                 AddTicketStockRequest ticketRequest = (AddTicketStockRequest) data;
-//                addTicketStocks(ticketRequest);
+                addTicketStocks(ticketRequest);
+            } else if (operationId.startsWith("update_ticket_price_")) {
+                UpdateTicketPriceRequest ticketRequest = (UpdateTicketPriceRequest) data;
+                updateTicketPrice(ticketRequest);
+            } else if (operationId.startsWith("reserve_tickets_")) {
+                ReserveTicketsRequest ticketRequest = (ReserveTicketsRequest) data;
+                // Todo: uncomment
+//                reserveTickets(ticketRequest);
+            } else if (operationId.startsWith("bulk_reserve_tickets_")) {
+                BulkReserveRequest bulkRequest = (BulkReserveRequest) data;
+                // todo: method
             }
-
-            // TODO: add other variations
 
             tempDataHolder = null;
         }
@@ -436,5 +669,109 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
         }
     }
 
+    private void cancelEvent(CancelEventRequest request) {
+        synchronized (TicketReservationServer.class) {
+            server.cancelEvent(request.getEventId());
+        }
+    }
 
+    private void addTicketStocks(AddTicketStockRequest request) {
+        synchronized (TicketReservationServer.class) {
+            String eventId = request.getEventId();
+            Event currentEvent = server.getEvent(eventId);
+
+            if (currentEvent != null) {
+                // Number of tickets to add
+                int ticketsToAdd = request.getCount();
+                System.out.println("Adding " + ticketsToAdd + " tickets");
+
+                if (request.getAfterParty()) {
+                    // Adding after party tickets
+
+                    // Number of ticket slots available
+                    int availableTicketSlots = currentEvent.getAfterPartyTicketsTotal() - currentEvent.getAfterPartyTicketsSold() - currentEvent.getAfterPartyTicketsAvailable();
+                    System.out.println("Available Ticket Slots: " + availableTicketSlots);
+
+
+                    if (ticketsToAdd <= availableTicketSlots) {
+                        Event newEvent = Event
+                                .newBuilder()
+                                .mergeFrom(currentEvent)
+                                .setAfterPartyTicketsAvailable(currentEvent.getAfterPartyTicketsAvailable() + ticketsToAdd)
+                                .build();
+                        server.updateEvent(newEvent);
+                    } else {
+                        System.err.println("Tickets not enough to be added");
+                    }
+                } else if (currentEvent.getTicketTiersMap().containsKey(request.getTier())) {
+                    // Adding tickets to a ticket tier
+                    TicketTier tier = currentEvent.getTicketTiersMap().get(request.getTier());
+
+                    // Number of ticket slots available
+                    int availableTicketSlots = tier.getTicketsTotal() - tier.getTicketsSold() - tier.getTicketsAvailable();
+
+                    if (ticketsToAdd <= availableTicketSlots) {
+                        TicketTier newTier = TicketTier
+                                .newBuilder()
+                                .mergeFrom(tier)
+                                .setTicketsAvailable(tier.getTicketsAvailable() + ticketsToAdd)
+                                .build();
+
+                        Event newEvent = Event
+                                .newBuilder()
+                                .mergeFrom(currentEvent)
+                                .putTicketTiers(newTier.getId(), newTier)
+                                .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() + ticketsToAdd)
+                                .build();
+
+                        server.updateEvent(newEvent);
+                    } else {
+                        System.err.println("Tickets not enough to be added");
+                    }
+                }
+            }
+        }
+    }
+
+    private void updateTicketPrice(UpdateTicketPriceRequest request) {
+        synchronized (TicketReservationServer.class) {
+            String eventId = request.getEventId();
+            Event currentEvent = server.getEvent(eventId);
+            if (currentEvent != null) {
+                Map<String, TicketTier> currentEventTicketTiersMap = currentEvent.getTicketTiersMap();
+                TicketTier tier = currentEventTicketTiersMap.get(request.getTier());
+                if (tier != null) {
+                    TicketTier newTier = TicketTier
+                            .newBuilder()
+                            .mergeFrom(tier)
+                            .setPrice(request.getPrice())
+                            .build();
+
+                    Event newEvent = Event
+                            .newBuilder()
+                            .mergeFrom(currentEvent)
+                            .putTicketTiers(tier.getId(), newTier)
+                            .build();
+
+                    server.updateEvent(newEvent);
+                }
+            }
+        }
+    }
+
+//    private void reserveTickets(ReserveTicketsRequest request) {
+//        synchronized (TicketReservationServer.class) {
+//            String eventId = request.getEventId();
+//            Event currentEvent = server.getEvent(eventId);
+//            if (currentEvent != null) {
+//                Map<String, TicketTier> currentEventTicketTiersMap = currentEvent.getTicketTiersMap();
+//                TicketTier tier = currentEventTicketTiersMap.get(request.getTier());
+//                if (tier != null) {
+//                    if (currentEvent.getEventTicketsAvailable() > 0) {}
+//
+//                    }
+//                }
+//            }
+//        }
+//    }
 }

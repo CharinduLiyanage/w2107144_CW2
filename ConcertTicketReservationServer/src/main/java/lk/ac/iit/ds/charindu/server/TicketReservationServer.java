@@ -4,10 +4,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
-import lk.ac.iit.ds.charindu.grpc.generated.Event;
-import lk.ac.iit.ds.charindu.grpc.generated.EventQueryServiceGrpc;
-import lk.ac.iit.ds.charindu.grpc.generated.GetEventsRequest;
-import lk.ac.iit.ds.charindu.grpc.generated.GetEventsResponse;
+import lk.ac.iit.ds.charindu.grpc.generated.*;
 import lk.ac.iit.ds.charindu.registration.NameServiceClient;
 import lk.ac.iit.ds.charindu.server.services.EventCommandServiceImpl;
 import lk.ac.iit.ds.charindu.server.services.EventQueryServiceImpl;
@@ -304,64 +301,8 @@ public class TicketReservationServer {
         db.put(event.getId(), event);
     }
 
-//    public void cancelEvent(String eventId) {
-//        events.remove(eventId);
-//    }
-//
-//    public void addTicketStocks(AddTicketStockRequest request) {
-//        String eventId = request.getEventId();
-//        Event currentEvent = getEvent(eventId);
-//
-//        if (currentEvent != null) {
-//            // Number of tickets to add
-//            int ticketsToAdd = request.getCount();
-//            System.out.println("Adding " + ticketsToAdd + " tickets");
-//
-//            if (request.getAfterParty()) {
-//                // Adding after party tickets
-//
-//                // Number of ticket slots available
-//                int availableTicketSlots = currentEvent.getAfterPartyTicketsTotal() - currentEvent.getAfterPartyTicketsSold() - currentEvent.getAfterPartyTicketsAvailable();
-//                System.out.println("Available Ticket Slots: " + availableTicketSlots);
-//
-//
-//                if (ticketsToAdd <= availableTicketSlots) {
-//                    Event newEvent = Event
-//                            .newBuilder()
-//                            .mergeFrom(currentEvent)
-//                            .setAfterPartyTicketsAvailable(currentEvent.getAfterPartyTicketsAvailable() + ticketsToAdd)
-//                            .build();
-//                    updateEvent(newEvent);
-//                } else {
-//                    System.err.println("Tickets not enough to be added");
-//                }
-//            } else if (currentEvent.getTicketTiersMap().containsKey(request.getTier())) {
-//                // Adding tickets to a ticket tier
-//                TicketTier tier = currentEvent.getTicketTiersMap().get(request.getTier());
-//
-//                // Number of ticket slots available
-//                int availableTicketSlots = tier.getTicketsTotal() - tier.getTicketsSold() - tier.getTicketsAvailable();
-//
-//                if (ticketsToAdd <= availableTicketSlots) {
-//                    TicketTier newTier = TicketTier
-//                            .newBuilder()
-//                            .mergeFrom(tier)
-//                            .setTicketsAvailable(tier.getTicketsAvailable() + ticketsToAdd)
-//                            .build();
-//
-//                    Event newEvent = Event
-//                            .newBuilder()
-//                            .mergeFrom(currentEvent)
-//                            .putTicketTiers(newTier.getId(), newTier)
-//                            .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() + ticketsToAdd)
-//                            .build();
-//
-//                    updateEvent(newEvent);
-//                } else {
-//                    System.err.println("Tickets not enough to be added");
-//                }
-//            }
-//        }
-//    }
+    public void cancelEvent(String eventId) {
+        db.remove(eventId);
+    }
 
 }
