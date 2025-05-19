@@ -790,6 +790,7 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
                             newTierBuilder
                                     .setTicketsAvailable(currentTier.getTicketsAvailable() - 1)
                                     .setTicketsSold(currentTier.getTicketsSold() + 1);
+
                             newEventBuilder
                                     .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() - 1)
                                     .setEventTicketsSold(currentEvent.getEventTicketsSold() - 1)
@@ -811,22 +812,35 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
                 TicketTier currentTier = currentEventTicketTiersMap.get(request.getTier());
                 if (currentTier != null) {
                     int ticketsToBuy = request.getCount();
-                    if (currentEvent.getEventTicketsAvailable() >= ticketsToBuy) {
+                    if (currentTier.getTicketsAvailable() >= ticketsToBuy) {
                         Event.Builder newEventBuilder = Event
                                 .newBuilder()
                                 .mergeFrom(currentEvent);
+                        TicketTier.Builder newTierBuilder = TicketTier
+                                .newBuilder()
+                                .mergeFrom(currentTier);
                         if (request.getAfterParty()) {
                             if (currentEvent.getAfterPartyTicketsAvailable() > ticketsToBuy) {
+                                newTierBuilder
+                                        .setTicketsAvailable(currentTier.getTicketsAvailable() - ticketsToBuy)
+                                        .setTicketsSold(currentTier.getTicketsSold() + ticketsToBuy);
+
                                 newEventBuilder
                                         .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() - ticketsToBuy)
                                         .setAfterPartyTicketsAvailable(currentEvent.getAfterPartyTicketsAvailable() - ticketsToBuy)
                                         .setEventTicketsSold(currentEvent.getEventTicketsSold() + ticketsToBuy)
-                                        .setAfterPartyTicketsSold(currentEvent.getAfterPartyTicketsSold() + ticketsToBuy);
+                                        .setAfterPartyTicketsSold(currentEvent.getAfterPartyTicketsSold() + ticketsToBuy)
+                                        .putTicketTiers(currentTier.getId(), newTierBuilder.build());
                             }
                         } else {
+                            newTierBuilder
+                                    .setTicketsAvailable(currentTier.getTicketsAvailable() - ticketsToBuy)
+                                    .setTicketsSold(currentTier.getTicketsSold() + ticketsToBuy);
+
                             newEventBuilder
                                     .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() - ticketsToBuy)
-                                    .setEventTicketsSold(currentEvent.getEventTicketsSold() - ticketsToBuy);
+                                    .setEventTicketsSold(currentEvent.getEventTicketsSold() - ticketsToBuy)
+                                    .putTicketTiers(currentTier.getId(), newTierBuilder.build());
                         }
                         server.updateEvent(newEventBuilder.build());
                     }
