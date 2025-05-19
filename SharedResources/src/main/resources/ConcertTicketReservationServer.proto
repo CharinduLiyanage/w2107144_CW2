@@ -1,0 +1,133 @@
+syntax = "proto3";
+option java_multiple_files = true;
+package lk.ac.iit.ds.charindu.grpc.generated;
+
+
+service EventQueryService {
+  rpc GetEvents(GetEventsRequest) returns (GetEventsResponse);
+  rpc GetEvent(GetEventRequest) returns (GetEventResponse);
+}
+
+service EventCommandService {
+  // Event Organizer's APIs
+  rpc AddEvent(AddEventRequest) returns (EventResponse);
+  rpc UpdateEvent(UpdateEventRequest) returns (EventResponse);
+  rpc CancelEvent(CancelEventRequest) returns (EventResponse);
+
+  // Regional Box Office Clerk's APIs
+  rpc AddTicketStock(AddTicketStockRequest) returns (EventResponse);
+  rpc UpdateTicketPrice(UpdateTicketPriceRequest) returns (EventResponse);
+
+  // Customer's APIs
+  rpc ReserveTickets(ReserveTicketsRequest) returns (ReservationResponse);
+
+  // Event Coordinator's APIs
+  rpc BulkReserve(BulkReserveRequest) returns (ReservationResponse);
+}
+
+
+message Event {
+  string id = 1;  // username + current time (milli-seconds)
+  string name = 2;
+  string date = 3;
+  map<string, TicketTier> ticket_tiers = 4;
+  int32 event_tickets_total = 5;
+  int32 after_party_tickets_total = 6;
+  int32 event_tickets_sold = 7;
+  int32 after_party_tickets_sold = 8;
+  int32 event_tickets_available = 9;
+  int32 after_party_tickets_available = 10;
+  //  map<string, int32> seat_tiers = 4; // e.g., {"VIP": 50, "Regular": 200}
+  //  map<string, double> prices = 6; // e.g., {"VIP": 100.0, "Regular": 50.0}
+}
+
+message TicketTier {
+  string id = 1;
+  int32 price = 2;
+  int32 tickets_total = 3;
+  int32 tickets_sold = 4;
+  int32 tickets_available = 5;
+}
+
+
+// Get requests
+message GetEventsRequest {
+  bool is_server = 1;
+}
+
+message GetEventRequest {
+  string event_id = 1;
+}
+
+
+// 2 face commit requests
+message AddEventRequest {
+  Event event = 1;
+  bool is_sent_by_primary = 2;
+}
+
+message UpdateEventRequest {
+  Event event = 1;
+  bool is_sent_by_primary = 2;
+}
+
+message CancelEventRequest {
+  string event_id = 1;
+  bool is_sent_by_primary = 2;
+}
+
+message AddTicketStockRequest {
+  string event_id = 1;
+  string tier = 2;
+  int32 count = 3;
+  bool after_party = 4;
+  double price = 5;
+  bool is_sent_by_primary = 6;
+}
+
+message UpdateTicketPriceRequest {
+  string event_id = 1;
+  string tier = 2;
+  double price = 3;
+  bool is_sent_by_primary = 4;
+}
+
+message ReserveTicketsRequest {
+  string event_id = 1;
+  string tier = 2;
+  int32 count = 3;
+  bool after_party = 4;
+  string customer_id = 5;
+  bool is_sent_by_primary = 6;
+}
+
+message BulkReserveRequest {
+  string event_id = 1;
+  string tier = 2;
+  int32 count = 3;
+  bool after_party = 4;
+  string group_id = 5;
+  bool is_sent_by_primary = 6;
+}
+
+
+// Responses
+message ReservationResponse {
+  bool success = 1;
+  string message = 2;
+  string reservation_id = 3;
+}
+
+message EventResponse {
+  bool success = 1;
+  string message = 2;
+  Event event = 3;
+}
+
+message GetEventsResponse {
+  repeated Event events = 1;
+}
+
+message GetEventResponse {
+  Event event = 1;
+}
