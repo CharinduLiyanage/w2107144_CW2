@@ -123,7 +123,6 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
                             .setTier(originalRequest.getTier())
                             .setCount(originalRequest.getCount())
                             .setAfterParty(originalRequest.getAfterParty())
-                            .setGroupId(originalRequest.getGroupId())
                             .setIsSentByPrimary(true)
                             .build();
                     clientStub.bulkReserve(request);
@@ -619,6 +618,7 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
         if (tempDataHolder != null) {
             String operationId = tempDataHolder.getKey();
             Object data = tempDataHolder.getValue();
+            System.out.println("On global commit: " + operationId);
 
             // Handle the commited data based on the operation type
             if (operationId.startsWith("add_event_")) {
@@ -638,11 +638,11 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
                 updateTicketPrice(ticketRequest);
             } else if (operationId.startsWith("reserve_tickets_")) {
                 ReserveTicketsRequest ticketRequest = (ReserveTicketsRequest) data;
-                // Todo: uncomment
-//                reserveTickets(ticketRequest);
+                reserveTickets(ticketRequest);
             } else if (operationId.startsWith("bulk_reserve_tickets_")) {
                 BulkReserveRequest bulkRequest = (BulkReserveRequest) data;
-                // todo: method
+                // Todo: uncomment
+//                bulkReserve(bulkRequest);
             }
 
             tempDataHolder = null;
@@ -759,7 +759,39 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
         }
     }
 
-//    private void reserveTickets(ReserveTicketsRequest request) {
+    private void reserveTickets(ReserveTicketsRequest request) {
+        synchronized (TicketReservationServer.class) {
+            String eventId = request.getEventId();
+            Event currentEvent = server.getEvent(eventId);
+            if (currentEvent != null) {
+                Map<String, TicketTier> currentEventTicketTiersMap = currentEvent.getTicketTiersMap();
+                TicketTier tier = currentEventTicketTiersMap.get(request.getTier());
+                if (tier != null) {
+                    if (currentEvent.getEventTicketsAvailable() > 0) {
+                        Event.Builder newEventBuilder = Event
+                                .newBuilder()
+                                .mergeFrom(currentEvent);
+                        if (request.getAfterParty()) {
+                            if (currentEvent.getAfterPartyTicketsAvailable() > 0) {
+                                newEventBuilder
+                                        .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() - 1)
+                                        .setAfterPartyTicketsAvailable(currentEvent.getAfterPartyTicketsAvailable() - 1)
+                                        .setEventTicketsSold(currentEvent.getEventTicketsSold() + 1)
+                                        .setAfterPartyTicketsSold(currentEvent.getAfterPartyTicketsSold() + 1);
+                            }
+                        } else {
+                            newEventBuilder
+                                    .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() - 1)
+                                    .setEventTicketsSold(currentEvent.getEventTicketsSold() - 1);
+                        }
+                        server.updateEvent(newEventBuilder.build());
+                    }
+                }
+            }
+        }
+    }
+
+//    private void bulkReserve(BulkReserveRequest request) {
 //        synchronized (TicketReservationServer.class) {
 //            String eventId = request.getEventId();
 //            Event currentEvent = server.getEvent(eventId);
@@ -767,9 +799,8 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
 //                Map<String, TicketTier> currentEventTicketTiersMap = currentEvent.getTicketTiersMap();
 //                TicketTier tier = currentEventTicketTiersMap.get(request.getTier());
 //                if (tier != null) {
-//                    if (currentEvent.getEventTicketsAvailable() > 0) {}
+//                    int ticketsToAdd = request.getCount();
 //
-//                    }
 //                }
 //            }
 //        }

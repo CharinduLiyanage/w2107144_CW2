@@ -104,7 +104,6 @@ message BulkReserveRequest {
   string tier = 2;
   int32 count = 3;
   bool after_party = 4;
-  string group_id = 5;
   bool is_sent_by_primary = 6;
 }
 
@@ -113,7 +112,6 @@ message BulkReserveRequest {
 message ReservationResponse {
   bool success = 1;
   string message = 2;
-  string reservation_id = 3;
 }
 
 message EventResponse {
