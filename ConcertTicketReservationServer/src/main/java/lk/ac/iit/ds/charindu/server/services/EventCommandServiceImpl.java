@@ -641,8 +641,7 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
                 reserveTickets(ticketRequest);
             } else if (operationId.startsWith("bulk_reserve_tickets_")) {
                 BulkReserveRequest bulkRequest = (BulkReserveRequest) data;
-                // Todo: uncomment
-//                bulkReserve(bulkRequest);
+                bulkReserve(bulkRequest);
             }
 
             tempDataHolder = null;
@@ -765,24 +764,36 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
             Event currentEvent = server.getEvent(eventId);
             if (currentEvent != null) {
                 Map<String, TicketTier> currentEventTicketTiersMap = currentEvent.getTicketTiersMap();
-                TicketTier tier = currentEventTicketTiersMap.get(request.getTier());
-                if (tier != null) {
-                    if (currentEvent.getEventTicketsAvailable() > 0) {
+                TicketTier currentTier = currentEventTicketTiersMap.get(request.getTier());
+                if (currentTier != null) {
+                    if (currentTier.getTicketsAvailable() > 0) {
                         Event.Builder newEventBuilder = Event
                                 .newBuilder()
                                 .mergeFrom(currentEvent);
+                        TicketTier.Builder newTierBuilder = TicketTier
+                                .newBuilder()
+                                .mergeFrom(currentTier);
                         if (request.getAfterParty()) {
                             if (currentEvent.getAfterPartyTicketsAvailable() > 0) {
+                                newTierBuilder
+                                        .setTicketsAvailable(currentTier.getTicketsAvailable() - 1)
+                                        .setTicketsSold(currentTier.getTicketsSold() + 1);
+
                                 newEventBuilder
                                         .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() - 1)
                                         .setAfterPartyTicketsAvailable(currentEvent.getAfterPartyTicketsAvailable() - 1)
                                         .setEventTicketsSold(currentEvent.getEventTicketsSold() + 1)
-                                        .setAfterPartyTicketsSold(currentEvent.getAfterPartyTicketsSold() + 1);
+                                        .setAfterPartyTicketsSold(currentEvent.getAfterPartyTicketsSold() + 1)
+                                        .putTicketTiers(currentTier.getId(), newTierBuilder.build());
                             }
                         } else {
+                            newTierBuilder
+                                    .setTicketsAvailable(currentTier.getTicketsAvailable() - 1)
+                                    .setTicketsSold(currentTier.getTicketsSold() + 1);
                             newEventBuilder
                                     .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() - 1)
-                                    .setEventTicketsSold(currentEvent.getEventTicketsSold() - 1);
+                                    .setEventTicketsSold(currentEvent.getEventTicketsSold() - 1)
+                                    .putTicketTiers(currentTier.getId(), newTierBuilder.build());
                         }
                         server.updateEvent(newEventBuilder.build());
                     }
@@ -791,18 +802,36 @@ public class EventCommandServiceImpl extends EventCommandServiceGrpc.EventComman
         }
     }
 
-//    private void bulkReserve(BulkReserveRequest request) {
-//        synchronized (TicketReservationServer.class) {
-//            String eventId = request.getEventId();
-//            Event currentEvent = server.getEvent(eventId);
-//            if (currentEvent != null) {
-//                Map<String, TicketTier> currentEventTicketTiersMap = currentEvent.getTicketTiersMap();
-//                TicketTier tier = currentEventTicketTiersMap.get(request.getTier());
-//                if (tier != null) {
-//                    int ticketsToAdd = request.getCount();
-//
-//                }
-//            }
-//        }
-//    }
+    private void bulkReserve(BulkReserveRequest request) {
+        synchronized (TicketReservationServer.class) {
+            String eventId = request.getEventId();
+            Event currentEvent = server.getEvent(eventId);
+            if (currentEvent != null) {
+                Map<String, TicketTier> currentEventTicketTiersMap = currentEvent.getTicketTiersMap();
+                TicketTier currentTier = currentEventTicketTiersMap.get(request.getTier());
+                if (currentTier != null) {
+                    int ticketsToBuy = request.getCount();
+                    if (currentEvent.getEventTicketsAvailable() >= ticketsToBuy) {
+                        Event.Builder newEventBuilder = Event
+                                .newBuilder()
+                                .mergeFrom(currentEvent);
+                        if (request.getAfterParty()) {
+                            if (currentEvent.getAfterPartyTicketsAvailable() > ticketsToBuy) {
+                                newEventBuilder
+                                        .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() - ticketsToBuy)
+                                        .setAfterPartyTicketsAvailable(currentEvent.getAfterPartyTicketsAvailable() - ticketsToBuy)
+                                        .setEventTicketsSold(currentEvent.getEventTicketsSold() + ticketsToBuy)
+                                        .setAfterPartyTicketsSold(currentEvent.getAfterPartyTicketsSold() + ticketsToBuy);
+                            }
+                        } else {
+                            newEventBuilder
+                                    .setEventTicketsAvailable(currentEvent.getEventTicketsAvailable() - ticketsToBuy)
+                                    .setEventTicketsSold(currentEvent.getEventTicketsSold() - ticketsToBuy);
+                        }
+                        server.updateEvent(newEventBuilder.build());
+                    }
+                }
+            }
+        }
+    }
 }
