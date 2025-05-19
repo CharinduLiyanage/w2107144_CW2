@@ -37,6 +37,7 @@ public abstract class Client {
         NameServiceClient.ServiceDetails serviceDetails = client.findService("Concert-Ticket-Reservation-Server");
         host = serviceDetails.getIPAddress();
         port = serviceDetails.getPort();
+        System.out.println("server details: " + host + ":" + port);
 
 //        int serverNo = 0;
 //        String serverName ;
@@ -100,23 +101,23 @@ public abstract class Client {
         closeConnection();
     }
 
-    private static NameServiceClient.ServiceDetails selectServer(){
-        NameServiceClient.ServiceDetails serviceDetails;
-        List<String> name = new ArrayList<>();
-        int serverNo= 0;
-        Scanner scanner1 = new Scanner(System.in);
-        System.out.println("========== Select Connecting Server ========== ");
-        for(String serverName : serverDetailMap.keySet()){
-            serverNo++;
-            System.out.println("["+serverNo+"] "+serverName);
-            name.add(serverName);
-        }
-        System.out.print(" Select the number for connecting server: ");
-        int number = Integer.parseInt(scanner1.nextLine().trim());
-        System.out.println("================================================");
-        regServerID = name.get(number-1);
-        return serverDetailMap.get(name.get(number-1));
-    }
+//    private static NameServiceClient.ServiceDetails selectServer(){
+//        NameServiceClient.ServiceDetails serviceDetails;
+//        List<String> name = new ArrayList<>();
+//        int serverNo= 0;
+//        Scanner scanner1 = new Scanner(System.in);
+//        System.out.println("========== Select Connecting Server ========== ");
+//        for(String serverName : serverDetailMap.keySet()){
+//            serverNo++;
+//            System.out.println("["+serverNo+"] "+serverName);
+//            name.add(serverName);
+//        }
+//        System.out.print(" Select the number for connecting server: ");
+//        int number = Integer.parseInt(scanner1.nextLine().trim());
+//        System.out.println("================================================");
+//        regServerID = name.get(number-1);
+//        return serverDetailMap.get(name.get(number-1));
+//    }
 
 //    private void initializeConnection() {
 //        System.out.println("Initializing Connecting to server at " + serverIP + ":" + serverPort);

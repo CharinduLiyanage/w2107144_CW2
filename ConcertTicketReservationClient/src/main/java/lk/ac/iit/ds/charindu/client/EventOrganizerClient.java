@@ -448,15 +448,17 @@ public class EventOrganizerClient extends Client {
 
         System.out.println("Enter Event Date (YYYY-MM-DD): ");
         String eventDate = scanner.nextLine();
+        // todo: validate date
 
         System.out.println("Enter Total Number of Tickets Available: ");
         int ticketsTotal = scanner.nextInt();
         scanner.nextLine();
+        // todo: validate not negative
 
         System.out.println("Enter Total Number of After Party Tickets Available: ");
         int afterPartTicketsTotal = scanner.nextInt();
         scanner.nextLine();
-        // todo: cannot have more afterparty tickets than normal tickets
+        // todo: cannot have more afterparty tickets than normal tickets, and not negative
 
         String eventId = eventName + "-" + eventDate + "-" + currentTimeMillis();
 
@@ -527,7 +529,7 @@ public class EventOrganizerClient extends Client {
             System.out.println("Enter New Total Number of Tickets: ");
             int newTotalTickets = scanner.nextInt();
             scanner.nextLine();
-            // TODO: check for the amount that can be reduced, if its reduced.
+            // TODO: check for the amount that can be reduced, if its reduced. can not be negative
             newEvenBuilder.setEventTicketsTotal(newTotalTickets);
         }
 
@@ -539,6 +541,7 @@ public class EventOrganizerClient extends Client {
             scanner.nextLine();
             // TODO: check for the amount that can be reduced, if its reduced.
             // todo: cannot have more afterparty tickets than normal tickets
+            // todo: can not be negative
             newEvenBuilder.setAfterPartyTicketsTotal(newTotalAfterPartyTickets);
         }
 
@@ -568,6 +571,8 @@ public class EventOrganizerClient extends Client {
             alertBox("Event not found", '!');
             return;
         }
+
+        // todo: prompt how many tickets + afterpart tickets ahas been sold
 
         CancelEventRequest cancelEventRequest = CancelEventRequest
                 .newBuilder()
@@ -609,6 +614,7 @@ public class EventOrganizerClient extends Client {
         System.out.println("Enter Ticket Tier Price: ");
         int price = scanner.nextInt();
         scanner.nextLine();
+        // todo: can not be negative
 
         int assignedTickets = 0;
         for (TicketTier tier : currentEventTicketTiersMap.values()) {
@@ -620,6 +626,7 @@ public class EventOrganizerClient extends Client {
         System.out.println("Enter Total Number of Tickets[" + ticketsSlotsAvailable + "]: ");
         int ticketsTotal = scanner.nextInt();
         scanner.nextLine();
+        // todo: can not be negative
 
         if (ticketsTotal > ticketsSlotsAvailable) {
             System.err.println("Tickets not enough");
@@ -701,7 +708,7 @@ public class EventOrganizerClient extends Client {
         ArrayList<String> ticketTiersIdList = new ArrayList<>(ticketTiersMap.keySet());
 
         String[] ticketTiersIdArray = ticketTiersIdList.toArray(new String[0]);
-
+        // todo: validate if there are ticket tiers in the event
         System.out.println("Select Ticket Tier to Update");
         numberMenu(ticketTiersIdArray);
         int ticketTierSelection = scanner.nextInt();

@@ -88,7 +88,7 @@ public class TicketReservationServer {
         int serverNo = 0;
         String serverName;
         boolean foundSpot = false;
-        int serverPort = port - 1;
+//        int serverPort = port - 1;
         NameServiceClient.ServiceDetails serviceDetails = null;
         List<String> connectedNodeData;
 
@@ -115,9 +115,9 @@ public class TicketReservationServer {
 
 
             regServerID = SERVER_NAME;
-            regServerPort = serverPort;
+            regServerPort = port;
             NameServiceClient client = new NameServiceClient(NAME_SERVICE_ADDRESS);
-            client.registerService(regServerID, ip, serverPort, "tcp");
+            client.registerService(regServerID, ip, regServerPort, "tcp");
 
             System.out.println("~~~~~ Server Registered Under| Sever Name: " + regServerID + " Server Address: " + ip + regServerPort);
         } catch (Exception e) {
@@ -298,6 +298,8 @@ public class TicketReservationServer {
     }
 
     public void updateEvent(Event event) {
+        System.out.println(new ArrayList<>(db.values()));
+        System.out.println(db.keySet());
         db.remove(event.getId());
         db.put(event.getId(), event);
     }
