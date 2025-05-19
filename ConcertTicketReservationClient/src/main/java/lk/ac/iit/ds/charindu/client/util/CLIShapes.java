@@ -1,9 +1,6 @@
 package lk.ac.iit.ds.charindu.client.util;
 
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 
 public class CLIShapes {
@@ -111,6 +108,16 @@ public class CLIShapes {
     public static void numberMenu(String[] options) {
         for (int i = 0; i < options.length; i++) {
             System.out.printf(" %d) ▶ %s%n", i + 1, options[i]);
+        }
+    }
+
+    public static boolean askYesNo(String prompt, Scanner scanner) {
+        while (true) {
+            System.out.println(prompt + " (Y/N)");
+            String input = scanner.nextLine().trim();
+            if (input.equalsIgnoreCase("Y")) return true;
+            if (input.equalsIgnoreCase("N")) return false;
+            System.out.println("Invalid input. Please enter 'Y' or 'N'.");
         }
     }
 }

@@ -5,6 +5,8 @@ import lk.ac.iit.ds.charindu.grpc.generated.*;
 import java.io.IOException;
 import java.util.*;
 import java.util.function.Function;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 import static java.lang.System.currentTimeMillis;
 import static lk.ac.iit.ds.charindu.client.util.CLIShapes.*;
@@ -446,19 +448,60 @@ public class EventOrganizerClient extends Client {
         System.out.println("Enter Event Name: ");
         String eventName = scanner.nextLine();
 
-        System.out.println("Enter Event Date (YYYY-MM-DD): ");
-        String eventDate = scanner.nextLine();
-        // todo: validate date
+        // Validate Event Date
+        String eventDate;
+        while (true) {
+            System.out.println("Enter Event Date (YYYY-MM-DD): ");
+            eventDate = scanner.nextLine();
+            try {
+                LocalDate.parse(eventDate); // throws exception if invalid
+                break;
+            } catch (DateTimeParseException e) {
+                System.out.println("Invalid date format. Please enter in YYYY-MM-DD format.");
+            }
+        }
 
-        System.out.println("Enter Total Number of Tickets Available: ");
-        int ticketsTotal = scanner.nextInt();
-        scanner.nextLine();
-        // todo: validate not negative
+        // Validate Total Tickets
+        int ticketsTotal;
+        while (true) {
+            System.out.println("Enter Total Number of Tickets Available: ");
+            if (scanner.hasNextInt()) {
+                ticketsTotal = scanner.nextInt();
+                if (ticketsTotal >= 0) {
+                    scanner.nextLine(); // consume newline
+                    break;
+                } else {
+                    System.out.println("Number of tickets cannot be negative.");
+                }
+            } else {
+                System.out.println("Please enter a valid integer.");
+                scanner.nextLine(); // consume invalid input
+            }
+        }
 
-        System.out.println("Enter Total Number of After Party Tickets Available: ");
-        int afterPartTicketsTotal = scanner.nextInt();
-        scanner.nextLine();
-        // todo: cannot have more afterparty tickets than normal tickets, and not negative
+        // Validate After Party Tickets
+        int afterPartTicketsTotal;
+        while (true) {
+            System.out.println("Enter Total Number of After Party Tickets Available: ");
+            if (scanner.hasNextInt()) {
+                afterPartTicketsTotal = scanner.nextInt();
+                scanner.nextLine(); // consume newline
+                if (afterPartTicketsTotal < 0) {
+                    System.out.println("After party tickets cannot be negative.");
+                } else if (afterPartTicketsTotal > ticketsTotal) {
+                    System.out.println("After party tickets cannot be more than total tickets.");
+                } else {
+                    break;
+                }
+            } else {
+                System.out.println("Please enter a valid integer.");
+                scanner.nextLine(); // consume invalid input
+            }
+        }
+
+        System.out.println("Event successfully created:");
+        System.out.printf("Name: %s, Date: %s, Tickets: %d, Afterparty: %d%n",
+                eventName, eventDate, ticketsTotal, afterPartTicketsTotal);
 
         String eventId = eventName + "-" + eventDate + "-" + currentTimeMillis();
 
@@ -511,44 +554,84 @@ public class EventOrganizerClient extends Client {
             return;
         }
 
-        Event.Builder newEvenBuilder = Event
-                .newBuilder()
-                .mergeFrom(currentEvent);
+        Event.Builder newEventBuilder = Event.newBuilder().mergeFrom(currentEvent);
 
-        System.out.println("Update the Event Name: [" + currentEvent.getName() + "] ? (Y/N)");
-        String isUpdateEventName = scanner.nextLine();
-        if (isUpdateEventName.equalsIgnoreCase("Y")) {
+        // Update Event Name
+        if (askYesNo("Update the Event Name: [" + currentEvent.getName() + "] ?", scanner)) {
             System.out.println("Enter New Event Name: ");
             String newEventName = scanner.nextLine();
-            newEvenBuilder.setName(newEventName);
+            newEventBuilder.setName(newEventName);
         }
 
-        System.out.println("Update the total no of tickets: [" + currentEvent.getEventTicketsTotal() + "] ? (Y/N)");
-        String isUpdateTotalNoOfTickets = scanner.nextLine();
-        if (isUpdateTotalNoOfTickets.equalsIgnoreCase("Y")) {
-            System.out.println("Enter New Total Number of Tickets: ");
-            int newTotalTickets = scanner.nextInt();
-            scanner.nextLine();
-            // TODO: check for the amount that can be reduced, if its reduced. can not be negative
-            newEvenBuilder.setEventTicketsTotal(newTotalTickets);
+        // Update Total Tickets
+        if (askYesNo("Update the total no of tickets: [" + currentEvent.getEventTicketsTotal() + "] ?", scanner)) {
+            int newTotalTickets;
+            while (true) {
+                System.out.println("Enter New Total Number of Tickets: ");
+                if (scanner.hasNextInt()) {
+                    newTotalTickets = scanner.nextInt();
+                    scanner.nextLine();
+
+                    if (newTotalTickets < 0) {
+                        System.out.println("Total tickets cannot be negative.");
+                    } else {
+                        int sold = currentEvent.getEventTicketsSold();
+                        int available = currentEvent.getEventTicketsAvailable();
+                        int requiredMinimum = sold + available;
+
+                        if (newTotalTickets < requiredMinimum) {
+                            System.out.printf("Total tickets cannot be less than sold + available tickets (%d).\n", requiredMinimum);
+                        } else if (newTotalTickets < currentEvent.getAfterPartyTicketsTotal()) {
+                            System.out.println("Total tickets cannot be less than after party tickets.");
+                        } else {
+                            break;
+                        }
+                    }
+                } else {
+                    System.out.println("Please enter a valid integer.");
+                    scanner.nextLine(); // consume invalid input
+                }
+            }
+            newEventBuilder.setEventTicketsTotal(newTotalTickets);
         }
 
-        System.out.println("Update the total no of after party tickets: [" + currentEvent.getAfterPartyTicketsTotal() + "] (Y/N)");
-        String isUpdateTotalNoOfAfterPartyTickets = scanner.nextLine();
-        if (isUpdateTotalNoOfAfterPartyTickets.equalsIgnoreCase("Y")) {
-            System.out.println("Enter New Total Number of after party Tickets: ");
-            int newTotalAfterPartyTickets = scanner.nextInt();
-            scanner.nextLine();
-            // TODO: check for the amount that can be reduced, if its reduced.
-            // todo: cannot have more afterparty tickets than normal tickets
-            // todo: can not be negative
-            newEvenBuilder.setAfterPartyTicketsTotal(newTotalAfterPartyTickets);
+        // Update After Party Tickets
+        if (askYesNo("Update the total no of after party tickets: [" + currentEvent.getAfterPartyTicketsTotal() + "] ?", scanner)) {
+            int newAfterPartyTickets;
+            while (true) {
+                System.out.println("Enter New Total Number of After Party Tickets: ");
+                if (scanner.hasNextInt()) {
+                    newAfterPartyTickets = scanner.nextInt();
+                    scanner.nextLine();
+
+                    if (newAfterPartyTickets < 0) {
+                        System.out.println("After party tickets cannot be negative.");
+                    } else {
+                        int sold = currentEvent.getAfterPartyTicketsSold();
+                        int available = currentEvent.getAfterPartyTicketsAvailable();
+                        int requiredMinimum = sold + available;
+
+                        if (newAfterPartyTickets < requiredMinimum) {
+                            System.out.printf("After party tickets cannot be less than sold + available tickets (%d).\n", requiredMinimum);
+                        } else if (newAfterPartyTickets > newEventBuilder.getEventTicketsTotal()) {
+                            System.out.println("After party tickets cannot exceed total event tickets.");
+                        } else {
+                            break;
+                        }
+                    }
+                } else {
+                    System.out.println("Please enter a valid integer.");
+                    scanner.nextLine(); // consume invalid input
+                }
+            }
+            newEventBuilder.setAfterPartyTicketsTotal(newAfterPartyTickets);
         }
 
         UpdateEventRequest updateEventRequest = UpdateEventRequest
                 .newBuilder()
-                .setEvent(newEvenBuilder.build())
+                .setEvent(newEventBuilder.build())
                 .build();
+
         waitForConnection();
 
         EventResponse updateEventResponse = eventCommandServiceBlockingStub.updateEvent(updateEventRequest);
@@ -572,20 +655,32 @@ public class EventOrganizerClient extends Client {
             return;
         }
 
-        // todo: prompt how many tickets + afterpart tickets ahas been sold
+        // Check ticket sales and confirm cancellation
+        int regularTicketsSold = currentEvent.getEventTicketsSold();
+        int afterPartyTicketsSold = currentEvent.getAfterPartyTicketsSold();
+
+        System.out.printf("This event has %d regular tickets and %d after party tickets sold.%n",
+                regularTicketsSold, afterPartyTicketsSold);
+
+        if (!askYesNo("Are you sure you want to cancel this event?", scanner)) {
+            System.out.println("Event cancellation aborted.");
+            return;
+        }
 
         CancelEventRequest cancelEventRequest = CancelEventRequest
                 .newBuilder()
                 .setEventId(currentEvent.getId())
                 .build();
+
         waitForConnection();
 
         EventResponse cancelEventResponse = eventCommandServiceBlockingStub.cancelEvent(cancelEventRequest);
         if (cancelEventResponse.getSuccess()) {
             System.out.println("Event Removed Successfully");
-        } else
+        } else {
             System.out.println("Event Not Removed Successfully");
-        System.err.println(cancelEventResponse.getMessage());
+            System.err.println(cancelEventResponse.getMessage());
+        }
     }
 
     private void addTicketTier() throws IOException, InterruptedException {
@@ -611,26 +706,49 @@ public class EventOrganizerClient extends Client {
             return;
         }
 
-        System.out.println("Enter Ticket Tier Price: ");
-        int price = scanner.nextInt();
-        scanner.nextLine();
-        // todo: can not be negative
-
-        int assignedTickets = 0;
-        for (TicketTier tier : currentEventTicketTiersMap.values()) {
-            assignedTickets += tier.getTicketsTotal();
+        // Validate ticket price (non-negative)
+        int price;
+        while (true) {
+            System.out.println("Enter Ticket Tier Price: ");
+            if (scanner.hasNextInt()) {
+                price = scanner.nextInt();
+                scanner.nextLine(); // consume newline
+                if (price < 0) {
+                    System.err.println("Price cannot be negative.");
+                } else {
+                    break;
+                }
+            } else {
+                System.err.println("Please enter a valid number.");
+                scanner.nextLine(); // consume invalid input
+            }
         }
+
+        // Calculate remaining tickets
+        int assignedTickets = currentEventTicketTiersMap.values().stream()
+                .mapToInt(TicketTier::getTicketsTotal)
+                .sum();
 
         int ticketsSlotsAvailable = currentEvent.getEventTicketsTotal() - assignedTickets;
 
-        System.out.println("Enter Total Number of Tickets[" + ticketsSlotsAvailable + "]: ");
-        int ticketsTotal = scanner.nextInt();
-        scanner.nextLine();
-        // todo: can not be negative
-
-        if (ticketsTotal > ticketsSlotsAvailable) {
-            System.err.println("Tickets not enough");
-            return;
+        // Validate total tickets (non-negative and within available slots)
+        int ticketsTotal;
+        while (true) {
+            System.out.println("Enter Total Number of Tickets [" + ticketsSlotsAvailable + "]: ");
+            if (scanner.hasNextInt()) {
+                ticketsTotal = scanner.nextInt();
+                scanner.nextLine(); // consume newline
+                if (ticketsTotal < 0) {
+                    System.err.println("Total tickets cannot be negative.");
+                } else if (ticketsTotal > ticketsSlotsAvailable) {
+                    System.err.println("Not enough ticket slots available.");
+                } else {
+                    break;
+                }
+            } else {
+                System.err.println("Please enter a valid number.");
+                scanner.nextLine(); // consume invalid input
+            }
         }
 
         TicketTier newTicketTier = TicketTier
@@ -655,10 +773,11 @@ public class EventOrganizerClient extends Client {
         if (updateEventResponse.getSuccess()) {
             System.out.println("Ticket Tier Added");
         } else {
-            System.out.println("Ticket Tier Added");
+            System.out.println("Ticket Tier Not Added");
             System.out.println(updateEventResponse.getMessage());
         }
     }
+
 
     private void getTicketTiers() throws IOException, InterruptedException {
         promptBox("Get Ticket Tiers of an Event");
@@ -705,24 +824,32 @@ public class EventOrganizerClient extends Client {
         }
 
         Map<String, TicketTier> ticketTiersMap = currentEvent.getTicketTiersMap();
-        ArrayList<String> ticketTiersIdList = new ArrayList<>(ticketTiersMap.keySet());
 
+        if (ticketTiersMap.isEmpty()) {
+            System.err.println("No ticket tiers found for this event.");
+            return;
+        }
+
+        ArrayList<String> ticketTiersIdList = new ArrayList<>(ticketTiersMap.keySet());
         String[] ticketTiersIdArray = ticketTiersIdList.toArray(new String[0]);
-        // todo: validate if there are ticket tiers in the event
+
         System.out.println("Select Ticket Tier to Update");
         numberMenu(ticketTiersIdArray);
         int ticketTierSelection = scanner.nextInt();
         scanner.nextLine();
 
-        TicketTier currentTicketTier = ticketTiersMap.get(ticketTiersIdArray[ticketTierSelection-1]);
+        if (ticketTierSelection < 1 || ticketTierSelection > ticketTiersIdArray.length) {
+            System.err.println("Invalid selection");
+            return;
+        }
 
+        TicketTier currentTicketTier = ticketTiersMap.get(ticketTiersIdArray[ticketTierSelection - 1]);
         TicketTier.Builder newTicketTierBuilder = TicketTier
                 .newBuilder()
                 .mergeFrom(currentTicketTier);
 
-        System.out.println("Update Ticket Tier Id: [" + currentTicketTier.getId() + "] ? (Y/N)");
-        String isUpdateTicketTierName = scanner.nextLine();
-        if (isUpdateTicketTierName.equalsIgnoreCase("Y")) {
+        // Update ID
+        if (askYesNo("Update Ticket Tier Id: [" + currentTicketTier.getId() + "] ?", scanner)) {
             System.out.println("Enter New Ticket Tier Id: ");
             String newTicketTierName = scanner.nextLine();
             if (ticketTiersIdList.contains(newTicketTierName)) {
@@ -732,22 +859,48 @@ public class EventOrganizerClient extends Client {
             newTicketTierBuilder.setId(newTicketTierName);
         }
 
-        System.out.println("Update Ticket Tier Price: [" + currentTicketTier.getPrice() + "] (Y/N)");
-        String isUpdateTicketTierPrice = scanner.nextLine();
-        if (isUpdateTicketTierPrice.equalsIgnoreCase("Y")) {
-            System.out.println("Enter New Ticket Tier Price: ");
-            int newTicketTierPrice = scanner.nextInt();
-            scanner.nextLine();
+        // Update Price
+        if (askYesNo("Update Ticket Tier Price: [" + currentTicketTier.getPrice() + "] ?", scanner)) {
+            int newTicketTierPrice;
+            while (true) {
+                System.out.println("Enter New Ticket Tier Price: ");
+                if (scanner.hasNextInt()) {
+                    newTicketTierPrice = scanner.nextInt();
+                    scanner.nextLine(); // consume newline
+                    if (newTicketTierPrice < 0) {
+                        System.err.println("Price cannot be negative.");
+                    } else {
+                        break;
+                    }
+                } else {
+                    System.err.println("Please enter a valid number.");
+                    scanner.nextLine(); // discard invalid input
+                }
+            }
             newTicketTierBuilder.setPrice(newTicketTierPrice);
         }
 
-        System.out.println("Update Ticket Tier Total Tickets: [" + currentTicketTier.getTicketsTotal() + "] (Y/N)");
-        String isUpdateTicketTierTotalTickets = scanner.nextLine();
-        if (isUpdateTicketTierTotalTickets.equalsIgnoreCase("Y")) {
-            System.out.println("Enter New Ticket Tier Total Tickets: ");
-            int newTicketTierTotalTickets = scanner.nextInt();
-            scanner.nextLine();
-            // TODO: check for the amount that can be reduced, if its reduced.
+        // Update Total Tickets
+        if (askYesNo("Update Ticket Tier Total Tickets: [" + currentTicketTier.getTicketsTotal() + "] ?", scanner)) {
+            int newTicketTierTotalTickets;
+            while (true) {
+                System.out.println("Enter New Ticket Tier Total Tickets: ");
+                if (scanner.hasNextInt()) {
+                    newTicketTierTotalTickets = scanner.nextInt();
+                    scanner.nextLine(); // consume newline
+                    if (newTicketTierTotalTickets < 0) {
+                        System.err.println("Total tickets cannot be negative.");
+                    } else if (newTicketTierTotalTickets < currentTicketTier.getTicketsSold()) {
+                        System.err.println("Cannot reduce total tickets below the number of tickets already sold (" +
+                                currentTicketTier.getTicketsSold() + ").");
+                    } else {
+                        break;
+                    }
+                } else {
+                    System.err.println("Please enter a valid number.");
+                    scanner.nextLine(); // discard invalid input
+                }
+            }
             newTicketTierBuilder.setTicketsTotal(newTicketTierTotalTickets);
         }
 
@@ -755,6 +908,7 @@ public class EventOrganizerClient extends Client {
 
         Event newEvent = Event
                 .newBuilder()
+                .mergeFrom(currentEvent)
                 .removeTicketTiers(currentTicketTier.getId())
                 .putTicketTiers(newTicketTier.getId(), newTicketTier)
                 .build();
